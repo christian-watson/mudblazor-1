@@ -52,9 +52,9 @@
 {
 
     <p>Dictionary parse:</p>
-    <table>
+    <MudSimpleTable>
         <thead>
-            <tr style="background-color: white;">
+            <tr style="background-color: black; color:white;">
                 <th>Reader ID</th>
                 <th>Reader name</th>
                 <th>event num</th>
@@ -74,7 +74,8 @@
                 </tr>
             }
         </tbody>
-    </table>
+    </MudSimpleTable>
+
 }
 else
 {
@@ -84,6 +85,44 @@ else
     @foreach(var kvp in readerIDDict){
         <p>@kvp.Value</p>
     }
+
+}
+
+@if (masterDictionary != null && masterDictionary.Count > 0)
+{
+
+    <p>Dictionary parse:</p>
+    <MudSimpleTable>
+        <thead>
+            <tr style="background-color: black; color:white;">
+                <th>Day of week</th>
+                <th>Number of events</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var kvp in masterDictionary)
+            {
+                var dayOfWeek = kvp.Key; 
+                var readerEvents = kvp.Value;
+
+                <tr>
+                    <td>@dayOfWeek</td>
+                    <td>@readerEvents.Count</td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+
+}
+else
+{
+    <p>No data available.</p>
+    <p>@(masterDictionary !=null)</p>
+    <p>@(masterDictionary.Count > 0)</p>
+    @foreach(var kvp in masterDictionary){
+        <p>@kvp.Value</p>
+    }
+
 }
 
 @code
@@ -95,16 +134,16 @@ else
         {
             this.files.Add(file);
         }
-        //TODO upload the files to the server
     }
 
     private void UploadFiles2(IBrowserFile file)
     {
         files.Add(file);
-        //TODO upload the files to the server
         FileUploaded(file);
     }
     private Dictionary<string,List<ReaderEvent>> readerIDDict = new Dictionary<string, List<ReaderEvent>>();
+        private Dictionary<string,List<ReaderEvent>> masterDictionary = new Dictionary<string, List<ReaderEvent>>();
+    
     public class ReaderEvent{
         
         private List<ReaderEvent> readerEvents = new List<ReaderEvent>();
@@ -136,6 +175,24 @@ else
             return $"Time: {Time}. Location: {Location}. Reader Description: {ReaderDesc}. DevId: {DevId}. Machine ID: {MachineId}";
         }
 
+         public static Dictionary<string,List<ReaderEvent>> masterDict(List<ReaderEvent> newReaderEvents){
+            Dictionary<string,List<ReaderEvent>> keyValuePairs = new Dictionary<string, List<ReaderEvent>>();
+            foreach(ReaderEvent i in newReaderEvents){
+                DateTime dateTime = DateTime.Parse(i.Time);
+                string dayValue = dateTime.ToString("D").Split(",")[0];
+                if(keyValuePairs.ContainsKey(dayValue)){
+                    keyValuePairs.TryGetValue(dayValue, out var value);
+                    value.Add(i);
+                }
+                else{
+                    List<ReaderEvent> newReader = new List<ReaderEvent>();
+                        newReader.Add(i);
+                        keyValuePairs.Add(dayValue,newReader);
+                }
+            }
+            return keyValuePairs;
+        }
+        
         public static Dictionary<String, List<ReaderEvent>> returnDictionary(List<ReaderEvent> readerEvents){
             Dictionary<String,List<ReaderEvent>> returnDict = new Dictionary<string, List<ReaderEvent>>();
             foreach(ReaderEvent i in readerEvents){
@@ -151,31 +208,35 @@ else
             }
             return returnDict;
             }
-        public static List<String[]> returnStrings(string filename){
-        String line;
-        List<String[]> returnString = new List<string[]>();
-        try{
-            StreamReader sr = new StreamReader(filename);
+        public static List<String[]> returnStrings(string Filename)
+{
+    String line;
+    List<String[]> returnString = new List<string[]>();
+    try
+    {
+        using (StreamReader sr = new StreamReader(Filename))
+        {
             line = sr.ReadLine();
             line = sr.ReadLine();
-            while (line!= null){
+            while (line != null)
+            {
                 returnString.Add(line.Split(','));
                 line = sr.ReadLine();
             }
-        sr.Close();
         }
-        catch(Exception e)
-        {
-            Console.WriteLine("Exception: " + e.Message);
-            return null;
-        }
-        finally
-        {
-            Console.WriteLine("Executing finally block.");
-        }
-    return returnString;
+    }
+    catch (Exception e)
+    {
+        Console.WriteLine("Exception: " + e.Message + " in returnStrings");
+        return null;
+    }
+    finally
+    {
+        Console.WriteLine("Executing finally block.");
     }
 
+    return returnString;
+}
 
         public static List<ReaderEvent> Display(List<String[]> returnList){
             List<ReaderEvent> readerEvents = new List<ReaderEvent>();
@@ -191,14 +252,16 @@ else
 
         
 
+
+        
+
         
 
     }
 
 
     
-    // private List<string[]> data = new List<string[]>();
-    // private List<string> lines = new List<string>();
+
     private List<ReaderEvent> newEvents = new List<ReaderEvent>();
     public string FileName { get; set; } = "";
     public long FileSize { get; set; }
@@ -207,7 +270,7 @@ else
     public DateTimeOffset LastModified { get; set; }
     public string ErrorMessage { get; set; } = "";
 
-    const int MAX_FILESIZE = 1000000 * 1024; // 2 MB
+    const int MAX_FILESIZE = 1000000 * 1024;
     
     public async Task FileUploaded(IBrowserFile file)
 {
@@ -223,17 +286,17 @@ else
 
         try
         {
-            // Save the uploaded file
             var fileStream = browserFile.OpenReadStream(MAX_FILESIZE);
             var targetFilePath = Path.Combine(Path.GetTempPath(), FileName);
+            Console.WriteLine($"Saving file to: {targetFilePath}");
 
             using (var destinationStream = new FileStream(targetFilePath, FileMode.Create))
             {
                 await fileStream.CopyToAsync(destinationStream);
             }
 
-            // Process the file after saving
             finalDisplay(targetFilePath);
+            StateHasChanged();
         }
         catch (Exception exception)
         {
@@ -249,6 +312,9 @@ private void finalDisplay(string fileName)
         {
             newEvents = ReaderEvent.Display(listCount);
             readerIDDict = ReaderEvent.returnDictionary(newEvents);
+            masterDictionary = ReaderEvent.masterDict(newEvents);
+            StateHasChanged();
+
         }
     }
 
